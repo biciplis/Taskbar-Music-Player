@@ -1,4 +1,4 @@
-MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5
+MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5 
 ==============================================================
 
 What it does:
@@ -36,11 +36,11 @@ How to start:
 
 Usage:
 - The bar appears on the right side of the taskbar, near the clock.
-- When 2+ players run at the same time, a small ARROW appears on
-  the left of the title. Click it to open a panel listing every
+- When 2+ players run at the same time, just REST THE CURSOR on
+  the title for half a second: a panel opens listing every other
   active player, each with its own pause/play button, so you can
   silence one without touching the others. The panel closes by
-  itself when you move the mouse away. Winamp-style players are
+  itself when you move the mouse away from the title and panel. Winamp-style players are
   listed too and are paused by talking straight to their window
   (Winamp's classic command, foobar2000/MusicBee/AIMP command-line
   switches, standard media message for the rest); their play state
@@ -65,8 +65,7 @@ Usage:
   volume. Uses the default Windows "scroll inactive windows"
   setting.
 - Right-click the title: move back next to the clock, start with
-  Windows, media detection status, CLOSE (there is no X button;
-  close it from here).
+  Windows, CLOSE (there is no X button; close it from here).
 - When nothing is playing, the title area stays blank and the bar
   shrinks to a small pill.
 - If you change the taskbar theme/color and the background no
