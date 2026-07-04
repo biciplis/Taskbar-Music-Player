@@ -588,8 +588,6 @@ $GLYPH_PREV  = [string][char]0xE892
 $GLYPH_PLAY  = [string][char]0xE768
 $GLYPH_PAUSE = [string][char]0xE769
 $GLYPH_NEXT  = [string][char]0xE893
-$GLYPH_UP    = [string][char]0xE70E
-$GLYPH_DOWN  = [string][char]0xE70D
 
 # --- main window --------------------------------------------------------------
 $form = [System.Windows.Forms.Form]::new()
@@ -617,7 +615,7 @@ function Get-TaskbarBand {
 $band = Get-TaskbarBand
 $barH = [math]::Min((S 40), ($band.Height - (S 6)))
 if ($barH -lt (S 24)) { $barH = [math]::Max((S 22), $band.Height - 2) }
-$form.Size = [System.Drawing.Size]::new((S 438), $barH)
+$form.Size = [System.Drawing.Size]::new((S 420), $barH)
 
 # inner sizes derived from the bar height
 $btnH = $barH - (S 10)
@@ -713,7 +711,7 @@ $lbl.Add_Paint({
 $lblH = [System.Windows.Forms.TextRenderer]::MeasureText('Ag', $textFont).Height + 2
 if ($lblH -gt $btnH) { $lblH = $btnH }
 $lblY = [int][math]::Floor(($barH - $lblH) / 2)
-$lbl.Location     = [System.Drawing.Point]::new((S 30), $lblY)
+$lbl.Location     = [System.Drawing.Point]::new((S 12), $lblY)
 $lbl.Size         = [System.Drawing.Size]::new((S 290), $lblH)
 $lbl.Anchor       = 'Top, Left, Right'
 $form.Controls.Add($lbl)
@@ -737,15 +735,10 @@ function New-GlyphButton([string]$glyph, [int]$x, [int]$w, [int]$h, [int]$y, $fo
     return $b
 }
 
-$btnPrev  = New-GlyphButton $GLYPH_PREV  (S 328) (S 32) $btnH $btnY $glyphFont ''
-$btnPlay  = New-GlyphButton $GLYPH_PLAY  (S 362) (S 32) $btnH $btnY $glyphFont ''
-$btnNext  = New-GlyphButton $GLYPH_NEXT  (S 396) (S 32) $btnH $btnY $glyphFont ''
+$btnPrev  = New-GlyphButton $GLYPH_PREV  (S 310) (S 32) $btnH $btnY $glyphFont ''
+$btnPlay  = New-GlyphButton $GLYPH_PLAY  (S 344) (S 32) $btnH $btnY $glyphFont ''
+$btnNext  = New-GlyphButton $GLYPH_NEXT  (S 378) (S 32) $btnH $btnY $glyphFont ''
 
-# arrow left of the title: appears only when 2+ players are running at once
-$arrowSize = [math]::Min((S 18), $btnH)
-$btnMore = New-GlyphButton $GLYPH_UP (S 6) $arrowSize $arrowSize ([int][math]::Floor(($barH - $arrowSize) / 2)) $glyphFontSmall 'Active media'
-$btnMore.Visible = $false
-$btnMore.Anchor  = 'Top, Left'
 
 $btnPrev.Add_Click({
     $script:lockUntil = $script:tick + 5   # grace: hold the shown source
@@ -822,7 +815,6 @@ $lbl.Add_MouseWheel($wheel)
 $btnPrev.Add_MouseWheel($wheel)
 $btnPlay.Add_MouseWheel($wheel)
 $btnNext.Add_MouseWheel($wheel)
-$btnMore.Add_MouseWheel($wheel)
 
 # anchor the buttons to the right: when the bar width changes, they stay put
 $btnPrev.Anchor = 'Top, Right'
@@ -915,6 +907,22 @@ function Get-SessionAppName($sess) {
     return ($app -replace '\.exe$', '')
 }
 
+# a window region with generously rounded corners; Windows' built-in
+# rounding caps at ~8 px, this one goes as round as we like
+function New-RoundRegion([int]$w, [int]$h, [int]$r) {
+    $r = [int][math]::Max(1, [math]::Min($r, ([math]::Min($w, $h) / 2) - 1))
+    $d = $r * 2
+    $gp = [System.Drawing.Drawing2D.GraphicsPath]::new()
+    $gp.AddArc(0, 0, $d, $d, 180, 90)
+    $gp.AddArc(($w - $d), 0, $d, $d, 270, 90)
+    $gp.AddArc(($w - $d), ($h - $d), $d, $d, 0, 90)
+    $gp.AddArc(0, ($h - $d), $d, $d, 90, 90)
+    $gp.CloseFigure()
+    $reg = [System.Drawing.Region]::new($gp)
+    $gp.Dispose()
+    return $reg
+}
+
 $script:popup   = $null
 $script:popMiss = 0
 $script:popupWatch = [System.Windows.Forms.Timer]::new()
@@ -923,8 +931,8 @@ $script:popupWatch.Add_Tick({
     if (-not $script:popup) { $script:popupWatch.Stop(); return }
     $c = [System.Windows.Forms.Cursor]::Position
     $inPopup = $script:popup.Bounds.Contains($c)
-    $inArrow = $btnMore.RectangleToScreen($btnMore.ClientRectangle).Contains($c)
-    if ($inPopup -or $inArrow) { $script:popMiss = 0 }
+    $inTitle = $lbl.RectangleToScreen($lbl.ClientRectangle).Contains($c)
+    if ($inPopup -or $inTitle) { $script:popMiss = 0 }
     else {
         $script:popMiss++
         if ($script:popMiss -ge 3) { Close-SessionPanel }   # ~1.5s with the mouse away
@@ -938,7 +946,6 @@ function Close-SessionPanel {
         try { $script:popup.Close(); $script:popup.Dispose() } catch { }
         $script:popup = $null
     }
-    $btnMore.Text = $GLYPH_UP
 }
 
 function Show-SessionPanel {
@@ -996,11 +1003,13 @@ function Show-SessionPanel {
         $pop.ShowInTaskbar   = $false
         $pop.BackColor       = $colHover        # acts as a 1 px frame
         $pop.Size            = [System.Drawing.Size]::new($popW, $popH)
+        $pop.Region          = New-RoundRegion $popW $popH (S 14)
 
         $inner = [System.Windows.Forms.Panel]::new()
         $inner.BackColor = $colBack
         $inner.Location  = [System.Drawing.Point]::new(1, 1)
         $inner.Size      = [System.Drawing.Size]::new(($popW - 2), ($popH - 2))
+        $inner.Region    = New-RoundRegion ($popW - 2) ($popH - 2) ([math]::Max(1, (S 14) - 1))
         $pop.Controls.Add($inner)
 
         for ($i = 0; $i -lt $n; $i++) {
@@ -1070,16 +1079,26 @@ function Show-SessionPanel {
 
         $script:popup = $pop
         $pop.Show()
-        $btnMore.Text = $GLYPH_DOWN
         $script:popMiss = 0
         $script:popupWatch.Start()
     } catch { Close-SessionPanel }
 }
 
-$btnMore.Add_Click({
-    if ($script:popup) { Close-SessionPanel } else { Show-SessionPanel }
-    $form.ActiveControl = $null
+# hover-to-open: resting the cursor on the title for half a second opens
+# the players panel (only when 2+ players are running); moving the mouse
+# away from the title and the panel closes it, as before
+$script:hoverTimer = [System.Windows.Forms.Timer]::new()
+$script:hoverTimer.Interval = 500
+$script:hoverTimer.Add_Tick({
+    $script:hoverTimer.Stop()
+    if (-not $script:popup -and -not $script:drag -and $script:lastCount -ge 2) {
+        Show-SessionPanel
+    }
 })
+$lbl.Add_MouseEnter({
+    if (-not $script:popup) { $script:hoverTimer.Stop(); $script:hoverTimer.Start() }
+})
+$lbl.Add_MouseLeave({ $script:hoverTimer.Stop() })
 
 # --- current track refresh ------------------------------------------------------
 $script:busy = $false
@@ -1181,8 +1200,8 @@ function Update-Media {
             Set-Title $candTitle
             if ($candPlaying) { $btnPlay.Text = $GLYPH_PAUSE } else { $btnPlay.Text = $GLYPH_PLAY }
         }
-        # the arrow shows with 2+ players in total (Windows sessions plus
-        # Winamp-style players, deduped).
+        # the hover panel is armed with 2+ players in total (Windows sessions
+        # plus Winamp-style players, deduped).
         # NOTE: @( ) is load-bearing - PowerShell unrolls returned lists, and
         # .Count on a bare COM/WinRT object silently yields nothing
         $extra = 0
@@ -1193,8 +1212,7 @@ function Update-Media {
         }
         $script:lastCount = $smtc.Count + $extra
         $script:CountDbg = "smtc=$($smtc.Count) [$($names -join ', ')], players=[$($fbNames -join ', ')], extra=$extra, total=$($script:lastCount)"
-        $btnMore.Visible = ($script:lastCount -ge 2)
-        if (-not $btnMore.Visible -and $script:popup) { Close-SessionPanel }
+        if ($script:lastCount -lt 2 -and $script:popup) { Close-SessionPanel }
     } catch { } finally { $script:busy = $false }
 }
 
@@ -1274,6 +1292,7 @@ $dragDown = {
         $script:dragCur   = [System.Windows.Forms.Cursor]::Position
         $script:dragForm  = $form.Location
         $timer.Stop()
+        $script:hoverTimer.Stop()
         [MediaNative]::SetZPin($false)
     }
 }
@@ -1347,7 +1366,6 @@ $miReset   = $menu.Items.Add('Move back next to the clock')
 $miStartup = $menu.Items.Add('Start with Windows')
 $miStartup.CheckOnClick = $true
 $miStartup.Checked = (Test-Path $startupLnk)
-$miDiag = $menu.Items.Add('Media detection status')
 [void]$menu.Items.Add('-')
 $miExit = $menu.Items.Add('Close MediaBar')
 
@@ -1361,44 +1379,38 @@ $miReset.Add_Click({
     Save-Pos
 })
 $miStartup.Add_Click({ Set-Startup $miStartup.Checked })
-$miDiag.Add_Click({
-    $mgrTxt = 'no'; $sesTxt = 'no'; $app = '-'; $allTxt = '-'
-    if ($script:WinRtOk) {
-        try {
-            $all = @(Get-SessionList $true)
-            if ($script:MediaMgr) {
-                $mgrTxt = 'yes'
-                $s = $script:MediaMgr.GetCurrentSession()
-                if ($s) { $sesTxt = 'yes'; $app = $s.SourceAppUserModelId }
-            }
-            if ($all.Count -gt 0) {
-                $names = @()
-                foreach ($s2 in $all) {
-                    $st = ''
-                    try { $st = $s2.GetPlaybackInfo().PlaybackStatus.ToString() } catch { }
-                    $names += "$(Get-SessionAppName $s2) [$st]"
-                }
-                $allTxt = "$($all.Count): $($names -join ', ')"
-            } else { $allTxt = '0' }
-        } catch { $script:MediaErr = $_.Exception.Message }
-    }
-    $msg = "WinRT loaded: $(if ($script:WinRtOk) { 'yes' } else { 'no' })`n" +
-           "Media manager: $mgrTxt`n" +
-           "Active media session: $sesTxt`n" +
-           "Detected app: $app`n" +
-           "All sessions: $allTxt`n" +
-           "Detected players: $(
-                $fbs2 = @(Get-FallbackPlayers)
-                if ($fbs2.Count -gt 0) { ($fbs2 | ForEach-Object { $_.Name }) -join ', ' } else { '-' }
-           )`n" +
-           "List read: $(if ($script:SessDbg) { $script:SessDbg } else { '-' })`n" +
-           "Arrow logic: $(if ($script:CountDbg) { $script:CountDbg } else { '-' })`n" +
-           "Last error: $(if ($script:MediaErr) { $script:MediaErr } else { '-' })`n`n" +
-           "Note: VLC 3, classic WMP and Winamp never announce their track" +
-           " to Windows; for those, the title is read from the app window."
-    [void][System.Windows.Forms.MessageBox]::Show($msg, 'MediaBar - media diagnostics')
-})
 $miExit.Add_Click({ $form.Close() })
+
+# dark, rounded, slightly translucent right-click menu, matching the bar;
+# if anything here fails, the default system menu is used silently
+try {
+    Add-Type -ReferencedAssemblies System.Windows.Forms, System.Drawing -TypeDefinition @'
+using System.Drawing;
+using System.Windows.Forms;
+public class DarkMenuColors : ProfessionalColorTable {
+    static readonly Color Back  = Color.FromArgb(28, 28, 30);
+    static readonly Color Hover = Color.FromArgb(62, 62, 66);
+    public override Color ToolStripDropDownBackground { get { return Back; } }
+    public override Color ImageMarginGradientBegin  { get { return Back; } }
+    public override Color ImageMarginGradientMiddle { get { return Back; } }
+    public override Color ImageMarginGradientEnd    { get { return Back; } }
+    public override Color MenuBorder       { get { return Back; } }
+    public override Color MenuItemBorder   { get { return Hover; } }
+    public override Color MenuItemSelected { get { return Hover; } }
+    public override Color SeparatorDark    { get { return Hover; } }
+    public override Color SeparatorLight   { get { return Hover; } }
+}
+'@
+    $menu.Renderer = [System.Windows.Forms.ToolStripProfessionalRenderer]::new([DarkMenuColors]::new())
+} catch { }
+$menu.ShowImageMargin = $false
+$menu.ForeColor = $colText
+$menu.BackColor = $colBack
+$menu.Opacity   = 0.94
+$menu.Add_Opened({
+    # generously rounded corners, reshaped on every open (size varies)
+    try { $menu.Region = New-RoundRegion $menu.Width $menu.Height (S 14) } catch { }
+})
 
 $form.ContextMenuStrip = $menu
 $lbl.ContextMenuStrip  = $menu
@@ -1426,6 +1438,7 @@ $form.Add_FormClosing({
     Close-SessionPanel
     Save-Pos
     $timer.Stop()
+    $script:hoverTimer.Stop()
     [MediaNative]::StopZPinner()
 })
 
