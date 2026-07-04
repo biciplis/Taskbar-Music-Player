@@ -1,4 +1,4 @@
-MEDIABAR - mini player living inside the taskbar (Windows 11) vibecoded with Claude Fable 5
+MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5
 ==============================================================
 
 What it does:
