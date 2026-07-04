@@ -1,5 +1,6 @@
 MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5
-==============================================================
+
+<img width="1080" height="1080" alt="axaxaxa" src="https://github.com/user-attachments/assets/aa0efda4-76ef-489c-946d-fe503a89bfc3" />
 
 What it does:
 Shows the current track (Times New Roman) and three buttons
@@ -12,7 +13,7 @@ automatically, just like the taskbar, and comes back on its own.
 The width adapts to the title length; the buttons always stay in
 the same spot (the bar grows to the left).
 
-The title always follows what is actually AUDIBLE: a playing
+   The title always follows what is actually AUDIBLE: a playing
 Windows media session first (Spotify, browsers...), then a playing
 Winamp-style player, then a paused session. The three buttons
 control exactly the player being shown - for Winamp-style players
@@ -28,14 +29,21 @@ prev/next on the bar also locks the shown source for a few
 seconds, so the brief transition (while the track changes) cannot
 let another playing app hijack the title and the button target.
 
+<img width="963" height="117" alt="Screenshot 2026-07-04 230647" src="https://github.com/user-attachments/assets/0d7acb16-c5f0-4013-a69c-6a6cf244e840" />
+
+
+
 How to start:
+
 A) With the installer (recommended): run MediaBar-Setup.exe, pick
    the options you want (desktop shortcut, Start Menu, start with
    Windows) and finish. Files go to %LOCALAPPDATA%\MediaBar and an
    entry appears in Settings > Apps for clean uninstall (which also
    stops the running bar and removes the position/log files).
+
 B) Portable: extract the folder anywhere and double-click
    "Start MediaBar.vbs" - it starts completely silently.
+
 In both cases, if SmartScreen warns you: "More info" -> "Run
 anyway" (the setup and the scripts are unsigned).
 
@@ -57,6 +65,9 @@ Usage:
 - If Spotify is missing from the panel, enable "Show desktop
   overlay when using media keys" in Spotify's settings - that
   toggle IS Spotify's Windows media integration.
+  
+  <img width="764" height="238" alt="Screenshot 2026-07-04 194045" src="https://github.com/user-attachments/assets/57f97365-2124-4e14-9afb-410632765c10" />
+
 - Move it left/right: hold the title and drag. While dragging a
   plain box is shown; on release it melts back into the taskbar.
 - Mouse wheel over the bar: adjusts the volume ONLY for MEDIA apps
