@@ -1353,6 +1353,8 @@ function Set-Startup([bool]$on) {
                 $lnk.Arguments  = "-NoProfile -Sta -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
             }
             $lnk.WorkingDirectory = Split-Path $PSCommandPath
+            $ico = Join-Path (Split-Path $PSCommandPath) 'MediaBar.ico'
+            if (Test-Path $ico) { $lnk.IconLocation = "$ico,0" }
             $lnk.WindowStyle = 7
             $lnk.Save()
         } elseif (Test-Path $startupLnk) {
@@ -1362,10 +1364,11 @@ function Set-Startup([bool]$on) {
 }
 
 $menu = [System.Windows.Forms.ContextMenuStrip]::new()
-$miReset   = $menu.Items.Add('Move back next to the clock')
-$miStartup = $menu.Items.Add('Start with Windows')
+$miReset    = $menu.Items.Add('Move back next to the clock')
+$miStartup  = $menu.Items.Add('Start with Windows')
 $miStartup.CheckOnClick = $true
 $miStartup.Checked = (Test-Path $startupLnk)
+$miShortcut = $menu.Items.Add('Create desktop shortcut')
 [void]$menu.Items.Add('-')
 $miExit = $menu.Items.Add('Close MediaBar')
 
@@ -1379,6 +1382,27 @@ $miReset.Add_Click({
     Save-Pos
 })
 $miStartup.Add_Click({ Set-Startup $miStartup.Checked })
+$miShortcut.Add_Click({
+    # desktop shortcut: silent VBS launch, custom icon if MediaBar.ico is
+    # placed next to the script
+    try {
+        $ws  = New-Object -ComObject WScript.Shell
+        $lnk = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'MediaBar.lnk'))
+        $vbs = Join-Path (Split-Path $PSCommandPath) 'Start MediaBar.vbs'
+        if (Test-Path $vbs) {
+            $lnk.TargetPath = "$env:WINDIR\System32\wscript.exe"
+            $lnk.Arguments  = "`"$vbs`""
+        } else {
+            $lnk.TargetPath = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
+            $lnk.Arguments  = "-NoProfile -Sta -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`""
+        }
+        $lnk.WorkingDirectory = Split-Path $PSCommandPath
+        $ico = Join-Path (Split-Path $PSCommandPath) 'MediaBar.ico'
+        if (Test-Path $ico) { $lnk.IconLocation = "$ico,0" }
+        $lnk.WindowStyle = 7
+        $lnk.Save()
+    } catch { }
+})
 $miExit.Add_Click({ $form.Close() })
 
 # dark, rounded, slightly translucent right-click menu, matching the bar;
