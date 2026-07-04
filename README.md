@@ -1,4 +1,4 @@
-MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5 
+MEDIABAR - mini player inside the taskbar (Windows 11) vibecoded with Claude Fable 5
 ==============================================================
 
 What it does:
@@ -29,10 +29,15 @@ seconds, so the brief transition (while the track changes) cannot
 let another playing app hijack the title and the button target.
 
 How to start:
-1. Extract the folder anywhere (e.g. Documents).
-2. Double-click "Start MediaBar.vbs" - it starts completely
-   silently, with no console window.
-   If SmartScreen warns you: "More info" -> "Run anyway".
+A) With the installer (recommended): run MediaBar-Setup.exe, pick
+   the options you want (desktop shortcut, Start Menu, start with
+   Windows) and finish. Files go to %LOCALAPPDATA%\MediaBar and an
+   entry appears in Settings > Apps for clean uninstall (which also
+   stops the running bar and removes the position/log files).
+B) Portable: extract the folder anywhere and double-click
+   "Start MediaBar.vbs" - it starts completely silently.
+In both cases, if SmartScreen warns you: "More info" -> "Run
+anyway" (the setup and the scripts are unsigned).
 
 Usage:
 - The bar appears on the right side of the taskbar, near the clock.
@@ -65,7 +70,10 @@ Usage:
   volume. Uses the default Windows "scroll inactive windows"
   setting.
 - Right-click the title: move back next to the clock, start with
-  Windows, CLOSE (there is no X button; close it from here).
+  Windows, create a desktop shortcut, CLOSE (there is no X button;
+  close it from here). For a custom shortcut icon, place your icon
+  file next to MediaBar.ps1 named exactly "MediaBar.ico" BEFORE
+  creating the shortcut (it is also used for the autostart entry).
 - When nothing is playing, the title area stays blank and the bar
   shrinks to a small pill.
 - If you change the taskbar theme/color and the background no
