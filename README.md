@@ -29,12 +29,9 @@ prev/next on the bar also locks the shown source for a few
 seconds, so the brief transition (while the track changes) cannot
 let another playing app hijack the title and the button target.
 
-<img width="963" height="117" alt="Screenshot 2026-07-04 230647" src="https://github.com/user-attachments/assets/0d7acb16-c5f0-4013-a69c-6a6cf244e840" />
-
-
+<img width="628" height="46" alt="image" src="https://github.com/user-attachments/assets/7ce444bc-970c-4392-bd5d-264836f6a0ad" />
 
 How to start:
-
 A) With the installer (recommended): run MediaBar-Setup.exe, pick
    the options you want (desktop shortcut, Start Menu, start with
    Windows) and finish. Files go to %LOCALAPPDATA%\MediaBar and an
@@ -70,6 +67,11 @@ Usage:
 
 - Move it left/right: hold the title and drag. While dragging a
   plain box is shown; on release it melts back into the taskbar.
+- The speaker button (right of forward) switches the DEFAULT audio
+  output to the next active device, cycling through them (speakers,
+  headphones...); the new device's name flashes in the title for a
+  moment. Communication apps' device stays untouched, like the
+  Windows quick-settings switch.
 - Mouse wheel over the bar: adjusts the volume ONLY for MEDIA apps
   that are actively playing right now (players and browsers, plus
   the app shown in the title) - voice/chat apps like Discord, and
