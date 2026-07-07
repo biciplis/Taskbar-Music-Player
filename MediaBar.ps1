@@ -96,13 +96,60 @@ class MMDeviceEnumeratorCom { }
 
 [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IMMDeviceEnumerator {
-    int NotImpl1();   // EnumAudioEndpoints
+    [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IMMDeviceCollection devices);
     [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+}
+
+[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceCollection {
+    [PreserveSig] int GetCount(out int count);
+    [PreserveSig] int Item(int index, out IMMDevice device);
 }
 
 [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IMMDevice {
     [PreserveSig] int Activate(ref Guid iid, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object iface);
+    [PreserveSig] int OpenPropertyStore(int stgmAccess, out IPropertyStore properties);
+    [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+struct PropertyKey {
+    public Guid fmtid; public int pid;
+    public PropertyKey(Guid f, int p) { fmtid = f; pid = p; }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+struct PropVariant {
+    public ushort vt; public ushort r1; public ushort r2; public ushort r3;
+    public IntPtr p; public int r4;
+}
+
+[ComImport, Guid("886d8eeb-8cf2-4446-8d02-cdba1dbdcf99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IPropertyStore {
+    [PreserveSig] int GetCount(out int count);
+    [PreserveSig] int GetAt(int index, out PropertyKey key);
+    [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
+}
+
+// undocumented but stable since Vista; the same mechanism every audio
+// switcher utility uses to change the default output device
+[ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")]
+class PolicyConfigClientCom { }
+
+[ComImport, Guid("F8679F50-850A-41CF-9C72-430F290290C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IPolicyConfig {
+    int NotImpl1();   // GetMixFormat
+    int NotImpl2();   // GetDeviceFormat
+    int NotImpl3();   // ResetDeviceFormat
+    int NotImpl4();   // SetDeviceFormat
+    int NotImpl5();   // GetProcessingPeriod
+    int NotImpl6();   // SetProcessingPeriod
+    int NotImpl7();   // GetShareMode
+    int NotImpl8();   // SetShareMode
+    int NotImpl9();   // GetPropertyValue
+    int NotImpl10();  // SetPropertyValue
+    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
 }
 
 [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -256,6 +303,80 @@ public static class AppVolume {
             finally { if (en != null) Marshal.ReleaseComObject(en); }
             return list.ToArray();
         }
+    }
+
+    [DllImport("ole32.dll")]
+    static extern int PropVariantClear(ref PropVariant pvar);
+
+    // Switches the DEFAULT output device to the next active render device
+    // (cycling). Returns the friendly name of the new device, or null.
+    public static string CycleOutput() {
+        lock (cLock) {
+            try {
+                ReleaseMgr();   // the device changes; drop the cached chain
+                var de = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
+                string curId = null;
+                IMMDevice cur;
+                if (de.GetDefaultAudioEndpoint(0, 1, out cur) == 0 && cur != null) {
+                    cur.GetId(out curId);
+                    Marshal.ReleaseComObject(cur);
+                }
+                IMMDeviceCollection col;
+                if (de.EnumAudioEndpoints(0, 1, out col) != 0 || col == null) {
+                    Marshal.ReleaseComObject(de);
+                    return null;
+                }
+                int n; col.GetCount(out n);
+                string[] ids = new string[n];
+                string[] names = new string[n];
+                int curIdx = -1;
+                Guid fnGuid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0");
+                for (int i = 0; i < n; i++) {
+                    IMMDevice dev;
+                    if (col.Item(i, out dev) != 0 || dev == null) continue;
+                    string id; dev.GetId(out id);
+                    ids[i] = id;
+                    if (id == curId) curIdx = i;
+                    try {
+                        IPropertyStore ps;
+                        if (dev.OpenPropertyStore(0, out ps) == 0 && ps != null) {
+                            PropertyKey k = new PropertyKey(fnGuid, 14);   // FriendlyName
+                            PropVariant pv;
+                            if (ps.GetValue(ref k, out pv) == 0) {
+                                if (pv.vt == 31 && pv.p != IntPtr.Zero) names[i] = Marshal.PtrToStringUni(pv.p);
+                                PropVariantClear(ref pv);
+                            }
+                            Marshal.ReleaseComObject(ps);
+                        }
+                    } catch { }
+                    Marshal.ReleaseComObject(dev);
+                }
+                Marshal.ReleaseComObject(col);
+                Marshal.ReleaseComObject(de);
+                if (n < 1) return null;
+                if (n == 1) return names[0];   // nothing to switch to
+                int next = (curIdx + 1) % n;
+                if (next < 0) next = 0;
+                var pc = (IPolicyConfig)new PolicyConfigClientCom();
+                pc.SetDefaultEndpoint(ids[next], 0);   // eConsole
+                pc.SetDefaultEndpoint(ids[next], 1);   // eMultimedia
+                Marshal.ReleaseComObject(pc);
+                return (names[next] != null) ? names[next] : ("Output " + (next + 1));
+            } catch { return null; }
+        }
+    }
+
+    // returns null on timeout or failure
+    public static string CycleOutputSafe(int timeoutMs) {
+        string[] box = new string[1];
+        var t = new System.Threading.Thread(delegate() {
+            try { box[0] = CycleOutput(); } catch { }
+        });
+        t.IsBackground = true;
+        try { t.SetApartmentState(System.Threading.ApartmentState.MTA); } catch { }
+        t.Start();
+        if (!t.Join(timeoutMs)) return null;
+        return box[0];
     }
 
     // --- UI-thread-safe wrappers: the audio service can be busy (e.g. the
@@ -588,6 +709,7 @@ $GLYPH_PREV  = [string][char]0xE892
 $GLYPH_PLAY  = [string][char]0xE768
 $GLYPH_PAUSE = [string][char]0xE769
 $GLYPH_NEXT  = [string][char]0xE893
+$GLYPH_SPKR  = [string][char]0xE7F5
 
 # --- main window --------------------------------------------------------------
 $form = [System.Windows.Forms.Form]::new()
@@ -615,7 +737,7 @@ function Get-TaskbarBand {
 $band = Get-TaskbarBand
 $barH = [math]::Min((S 40), ($band.Height - (S 6)))
 if ($barH -lt (S 24)) { $barH = [math]::Max((S 22), $band.Height - 2) }
-$form.Size = [System.Drawing.Size]::new((S 420), $barH)
+$form.Size = [System.Drawing.Size]::new((S 454), $barH)
 
 # inner sizes derived from the bar height
 $btnH = $barH - (S 10)
@@ -701,8 +823,9 @@ $lbl.TextAlign    = 'MiddleLeft'
 # the text lives in $script:lastText and is painted by hand (see above)
 $lbl.Add_Paint({
     param($s, $e)
-    if ($script:lastText) {
-        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $script:lastText, $textFont, $s.ClientRectangle, $colText, $script:txtFlags)
+    $txt = if ($script:flashMsg -and $script:tick -lt $script:flashUntil) { $script:flashMsg } else { $script:lastText }
+    if ($txt) {
+        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $txt, $textFont, $s.ClientRectangle, $colText, $script:txtFlags)
     }
 })
 # label height = exactly one text line, vertically centered by position;
@@ -738,6 +861,7 @@ function New-GlyphButton([string]$glyph, [int]$x, [int]$w, [int]$h, [int]$y, $fo
 $btnPrev  = New-GlyphButton $GLYPH_PREV  (S 310) (S 32) $btnH $btnY $glyphFont ''
 $btnPlay  = New-GlyphButton $GLYPH_PLAY  (S 344) (S 32) $btnH $btnY $glyphFont ''
 $btnNext  = New-GlyphButton $GLYPH_NEXT  (S 378) (S 32) $btnH $btnY $glyphFont ''
+$btnOut   = New-GlyphButton $GLYPH_SPKR  (S 412) (S 32) $btnH $btnY $glyphFont ''
 
 
 $btnPrev.Add_Click({
@@ -766,6 +890,18 @@ $btnPlay.Add_Click({
     }
     # flip the icon optimistically, without waiting for the next refresh
     if ($btnPlay.Text -eq $GLYPH_PLAY) { $btnPlay.Text = $GLYPH_PAUSE } else { $btnPlay.Text = $GLYPH_PLAY }
+    $form.ActiveControl = $null
+})
+$btnOut.Add_Click({
+    # switch the DEFAULT audio output to the next active device (cycling)
+    # and flash the new device name in the title for a moment
+    $name = $null
+    try { $name = [AppVolume]::CycleOutputSafe(1500) } catch { }
+    if ($name) {
+        $script:flashMsg   = "> $name"
+        $script:flashUntil = $script:tick + 3
+        $lbl.Invalidate()
+    }
     $form.ActiveControl = $null
 })
 $btnNext.Add_Click({
@@ -815,11 +951,13 @@ $lbl.Add_MouseWheel($wheel)
 $btnPrev.Add_MouseWheel($wheel)
 $btnPlay.Add_MouseWheel($wheel)
 $btnNext.Add_MouseWheel($wheel)
+$btnOut.Add_MouseWheel($wheel)
 
 # anchor the buttons to the right: when the bar width changes, they stay put
 $btnPrev.Anchor = 'Top, Right'
 $btnPlay.Anchor = 'Top, Right'
 $btnNext.Anchor = 'Top, Right'
+$btnOut.Anchor  = 'Top, Right'
 
 # adaptive width constants
 $script:chromeW   = $form.Width - $lbl.Width      # everything that is not title
@@ -1115,6 +1253,8 @@ $script:smtcSession = $null
 $script:smtcApp     = ''
 $script:smtcNames   = @()
 $script:lockUntil   = 0
+$script:flashMsg    = $null
+$script:flashUntil  = 0
 $script:srcKey      = ''
 $script:pendKey     = ''
 $script:pendTicks   = 0
@@ -1266,6 +1406,10 @@ $timer.Interval = 1000
 $timer.Add_Tick({
     $script:tick++
     Update-Visibility
+    if ($script:flashMsg -and $script:tick -ge $script:flashUntil) {
+        $script:flashMsg = $null
+        $lbl.Invalidate()
+    }
     # the track is checked every 2 seconds: just as responsive, half the cost
     if ($form.Visible -and (($script:tick % 2) -eq 0)) { Update-Media }
     # roughly every 5 minutes, trim the residual memory
